@@ -3694,16 +3694,14 @@ body.dark .reviews-box{background:linear-gradient(160deg,#111d31,#172b45)!import
     let withdrawState = { selectedMethod: 'bkash', transactions: [] };
 
     function loadMethods() {
-      try {
-        const saved = localStorage.getItem('bajiPaymentMethods');
-        methods = saved ? JSON.parse(saved) : JSON.parse(JSON.stringify(DEFAULT_METHODS));
-        // Remove old hard-coded demo payment numbers from earlier versions.
-        const demoNumbers = ['01540730513','01841234567','01345678901','01712345678','0x7F...8A9B'];
-        let cleaned = false; methods = methods.map(m => { if (demoNumbers.includes(String(m.number || '').trim())) { cleaned = true; return {...m, number: ''}; } return m; });
-        if (cleaned) localStorage.setItem('bajiPaymentMethods', JSON.stringify(methods));
-      } catch(e) { methods = JSON.parse(JSON.stringify(DEFAULT_METHODS)); }
+      methods = JSON.parse(JSON.stringify(DEFAULT_METHODS)).map(m => ({...m, number: ''}));
+      fetch('api/payment-methods.php', {cache:'no-store'})
+        .then(r => { if (!r.ok) throw new Error('Payment settings unavailable'); return r.json(); })
+        .then(rows => { if (Array.isArray(rows)) { methods = rows; if (document.getElementById('depositModal')?.classList.contains('show')) renderDepositModal(); if (document.getElementById('withdrawModal')?.classList.contains('show')) renderWithdrawModal(); } })
+        .catch(() => { /* Fail closed: never display stale/demo payment numbers. */ });
     }
     function getMethodById(id) { return methods.find(m => m.id === id) || methods[0]; }
+    setInterval(() => { if (document.getElementById('depositModal')?.classList.contains('show') || document.getElementById('withdrawModal')?.classList.contains('show')) loadMethods(); }, 30000);
     function loadDepositState() {
       try { const saved = localStorage.getItem('bajiDepositData'); if (saved) { const p = JSON.parse(saved); depositState.selectedMethod = p.selectedMethod || 'nogod'; depositState.transactions = p.transactions || []; } } catch(e) {}
     }
